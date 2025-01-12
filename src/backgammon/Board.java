@@ -12,8 +12,8 @@ public class Board {
     private int checkersOutPlayer1;
     private int checkersOutPlayer2;
 
-    private Character player1Symbol;
-    private Character player2Symbol;
+    private final Character player1Symbol;
+    private final Character player2Symbol;
 
     private int maxRows;
 
@@ -30,6 +30,24 @@ public class Board {
         maxRows = 5;
     }
 
+    public Board(Board board) {
+        this.board = new int[board.board.length][];
+        for (int i = 0; i < board.board.length; i++) {
+            this.board[i] = board.board[i].clone();
+        }
+        this.barPlayer1 = board.barPlayer1;
+        this.barPlayer2 = board.barPlayer2;
+        this.homePlayer1 = board.homePlayer1;
+        this.homePlayer2 = board.homePlayer2;
+        this.checkersOutPlayer1 = board.checkersOutPlayer1;
+        this.checkersOutPlayer2 = board.checkersOutPlayer2;
+
+        this.player1Symbol = board.player1Symbol;
+        this.player2Symbol = board.player2Symbol;
+
+        this.maxRows = board.maxRows;
+    }
+
     private void initializeBoard() {
         //Player1 initial state
         board[0] = new int[]{2, 1};
@@ -44,49 +62,26 @@ public class Board {
         board[5] = new int[]{5, 2};
     }
 
-    public Board copy() {
-        Board newBoard = new Board();
-
-        newBoard.board = new int[this.board.length][];
-        for (int i = 0; i < this.board.length; i++) {
-            newBoard.board[i] = this.board[i].clone();
-        }
-        newBoard.barPlayer1 = this.barPlayer1;
-        newBoard.barPlayer2 = this.barPlayer2;
-        newBoard.homePlayer1 = this.homePlayer1;
-        newBoard.homePlayer2 = this.homePlayer2;
-        newBoard.checkersOutPlayer1 = this.checkersOutPlayer1;
-        newBoard.checkersOutPlayer2 = this.checkersOutPlayer2;
-
-        newBoard.player1Symbol = this.player1Symbol;
-        newBoard.player2Symbol = this.player2Symbol;
-
-        newBoard.maxRows = this.maxRows;
-
-        return newBoard;
-    }
-
     private void updateMaxRows() {
         boolean isChanged = false;
+        int tempMaxRows = 5;
         for (int i = 0; i < 24; i++) {
             if (board[i][0] > 5) {
-                maxRows = board[i][0];
+                tempMaxRows = Math.max(tempMaxRows, board[i][0]);
                 isChanged = true;
             }
         }
-        if (!isChanged) {
-            maxRows = 5;
-        }
+        maxRows = isChanged ? tempMaxRows : 5;
     }
 
     private void printBoardLine(int rowNumber, int startIndex, int endIndex, boolean isTop, boolean hasOnBar) {
-        List<Integer> indeciesOfColumns = List.of(50, 46, 42, 38, 34, 30, 21, 17, 13, 9, 5, 1);
+        List<Integer> indicesOfColumns = List.of(50, 46, 42, 38, 34, 30, 21, 17, 13, 9, 5, 1);
         StringBuilder line = new StringBuilder("|                       |   |                       |");
         for (int j = startIndex; j < endIndex; j++) {
             if (board[j][0] > rowNumber) {
                 Character symbol = (board[j][1] == 1) ? player1Symbol : player2Symbol;
                 int index = isTop ? j : endIndex - j - 1;
-                line.setCharAt(indeciesOfColumns.get(index), symbol);
+                line.setCharAt(indicesOfColumns.get(index), symbol);
             }
         }
 

@@ -1,9 +1,4 @@
-package backgammon.montecarlotreesearch;
-
-import backgammon.Action;
-import backgammon.Board;
-import backgammon.Dice;
-import backgammon.Move;
+package backgammon;
 
 import java.util.ArrayList;
 import java.util.AbstractMap;
@@ -13,7 +8,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-class GameState {
+public class GameState {
     Board board;
     Dice dice;
     int activePlayer; // 1 or 2
@@ -28,14 +23,12 @@ class GameState {
         isTerminal = false;
     }
 
-    public GameState copy() {
-        GameState newState = new GameState();
-        newState.board = this.board.copy();
-        newState.dice = this.dice;
-        newState.activePlayer = this.activePlayer;
-        newState.isTerminal = this.isTerminal;
-        newState.reward = this.reward;
-        return newState;
+    public GameState(GameState state) {
+        this.board = new Board(state.board);
+        this.dice = state.dice;
+        this.activePlayer = state.activePlayer;
+        this.isTerminal = state.isTerminal;
+        this.reward = state.reward;
     }
 
     private int getTargetPoint(int from, int die) {
@@ -351,7 +344,7 @@ class GameState {
             }
 
             int[] to = action.getTo();
-            if ( to != null) {
+            if (to != null) {
                 board[to[0]][0] = to[1];
                 board[to[0]][1] = to[2];
             }
@@ -365,11 +358,57 @@ class GameState {
         state.board.setCheckersOutPlayer2(move.getCheckersOutPlayer2());
     }
 
+    public Move getRevertMove(GameState state, Move move) {
+        List<Action> revertActions = new ArrayList<>();
+
+        int[][] board = state.board.getBoard();
+        for (Action action : move.getActions()) {
+            int[] from = action.getFrom();
+            int[] revertFrom = {-1, -1, -1};
+            if (from != null) {
+                revertFrom[0] = from[0];
+                revertFrom[1] = board[from[0]][0];
+                revertFrom[2] = board[from[0]][1];
+            }
+
+            int[] to = action.getTo();
+            int[] revertTo = {-1, -1, -1};
+            if (to != null) {
+                revertTo[0] = to[0];
+                revertTo[1] = board[to[0]][0];
+                revertTo[2] = board[to[0]][1];
+            }
+
+            revertActions.add(new Action(revertFrom[0], revertFrom[1], revertFrom[2],
+                    revertTo[0], revertTo[1], revertTo[2]));
+        }
+
+        return new Move(revertActions, state.board.getHomePlayer1(), state.board.getHomePlayer2(),
+                state.board.getBarPlayer1(), state.board.getBarPlayer2(), state.board.getCheckersOutPlayer1(),
+                state.board.getCheckersOutPlayer2());
+    }
+
     public boolean isGameOver() {
         return isTerminal;
     }
 
     public double evaluateReward() {
         return reward;
+    }
+
+    public int getActivePlayer() {
+        return activePlayer;
+    }
+
+    public void setActivePlayer(int activePlayer) {
+        this.activePlayer = activePlayer;
+    }
+
+    public void setDice(Dice dice) {
+        this.dice = dice;
+    }
+
+    public Board getBoard() {
+        return board;
     }
 }

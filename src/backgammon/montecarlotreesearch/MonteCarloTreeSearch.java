@@ -1,6 +1,7 @@
 package backgammon.montecarlotreesearch;
 
 import backgammon.Dice;
+import backgammon.GameState;
 import backgammon.Move;
 
 import java.util.ArrayList;
@@ -30,14 +31,14 @@ public class MonteCarloTreeSearch {
 
     private static void expand(Node node, int startPlayer) {
         Set<Move> possibleMoves = node.state.getPossibleMoves(startPlayer);
-        int inactivePlayer = (node.state.activePlayer == 1) ? 2 : 1;
+        int inactivePlayer = (node.state.getActivePlayer() == 1) ? 2 : 1;
         Random rand = new Random();
         Dice newDice = new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7), rand.nextInt(1, 7))));
         for (Move move : possibleMoves) {
-            GameState state = node.state.copy();
+            GameState state = new GameState(node.state);
             state.applyMove(state, move);
-            state.activePlayer = inactivePlayer;
-            state.dice = newDice;
+            state.setActivePlayer(inactivePlayer);
+            state.setDice(newDice);
 
             Node child = new Node(state, node);
             node.children.add(child);
@@ -46,7 +47,7 @@ public class MonteCarloTreeSearch {
 
     private static double simulate(Node node, int startPlayer) {
         Random rand = new Random();
-        GameState simulatedState = node.state.copy();
+        GameState simulatedState = new GameState(node.state);
         while (!simulatedState.isGameOver()) {
             Set<Move> possibleMoves = simulatedState.getPossibleMoves(startPlayer);
 
@@ -60,8 +61,9 @@ public class MonteCarloTreeSearch {
             System.out.println(simulatedState.dice);
             System.out.println(simulatedState.activePlayer);*/
             //Opponent player PLAYS
-            simulatedState.dice = new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7), rand.nextInt(1, 7))));
-            simulatedState.activePlayer = (simulatedState.activePlayer == 1) ? 2 : 1;
+            simulatedState.setDice(new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7),
+                    rand.nextInt(1, 7)))));
+            simulatedState.setActivePlayer((simulatedState.getActivePlayer() == 1) ? 2 : 1);
         }
         return simulatedState.evaluateReward();
     }
@@ -75,7 +77,7 @@ public class MonteCarloTreeSearch {
         }
     }
 
-    public static Node mcts(GameState rootState) {
+    private static Node mcts(GameState rootState) {
         Node rootNode = new Node(rootState, null);
 
         int simulationsCount = 0;
@@ -87,11 +89,11 @@ public class MonteCarloTreeSearch {
 
             // 2. Expansion
             if (selectedNode.visits != 0) {
-                expand(selectedNode, rootState.activePlayer);
+                expand(selectedNode, rootState.getActivePlayer());
             }
 
             // 3. Simulation/Rollout
-            double reward = simulate(selectedNode, rootState.activePlayer);
+            double reward = simulate(selectedNode, rootState.getActivePlayer());
 
             // 4. Backpropagation
             backpropagate(selectedNode, reward);
@@ -103,42 +105,17 @@ public class MonteCarloTreeSearch {
         return rootNode.bestChild();
     }
 
-    public static void main(String[] args) {
-        GameState currentState = new GameState();
-        currentState.board.printBoard();
-        System.out.println(currentState.dice);
-        System.out.println(currentState.activePlayer);
+    public static GameState playMove(GameState rootState) {
+        Node bestMoveNode = mcts(rootState);
 
-
-        /*Node bestMoveNode = mcts(currentState);
-        bestMoveNode.state.board.printBoard();
-        System.out.println(bestMoveNode.state.dice);
-        System.out.println("Best Move Reward: " + bestMoveNode.wins / bestMoveNode.visits);*/
-
-        // Run MCTS to get the best move.
-        Node bestMoveNode = null;
-        Node previousMoveNode = null;
-        do {
-            previousMoveNode = bestMoveNode;
-            bestMoveNode = mcts(currentState);
-            if (bestMoveNode == null) {
-                Random rand = new Random();
-                currentState.activePlayer = (currentState.activePlayer == 1) ? 2 : 1;
-                currentState.dice = new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7), rand.nextInt(1, 7))));
-                bestMoveNode = previousMoveNode;
-
-                System.out.println(currentState.dice);
-                System.out.println(currentState.activePlayer);
-                continue;
-            }
-            currentState = bestMoveNode.state;
-
-            bestMoveNode.state.board.printBoard();
+        if (bestMoveNode != null) {
             System.out.println("Best Move Reward: " + bestMoveNode.wins / bestMoveNode.visits);
-            System.out.println();
-            System.out.println(bestMoveNode.state.dice);
-            System.out.println(bestMoveNode.state.activePlayer);
+            return bestMoveNode.state;
         }
-        while (!bestMoveNode.state.isGameOver());
+        Random rand = new Random();
+        rootState.setDice(new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7),
+                rand.nextInt(1, 7)))));
+        rootState.setActivePlayer((rootState.getActivePlayer() == 1) ? 2 : 1);
+        return rootState;
     }
 }
