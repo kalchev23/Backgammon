@@ -2,6 +2,7 @@ package backgammon.montecarlotreesearch;
 
 import backgammon.Dice;
 import backgammon.GameState;
+import backgammon.Heuristic;
 import backgammon.Move;
 
 import java.util.ArrayList;
@@ -9,22 +10,30 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ExecutionException;
 
 public class MonteCarloTreeSearch {
-    private static final int SIMULATION_LIMIT = 1_000; // Number of simulations per move.
+    private static final int SIMULATION_LIMIT = 10_000; // Number of simulations per move.
     private static final int TIME_LIMIT = 5_000;
+    private static final int THREADS_COUNT = 12;
 
-    private static Node uctSelect(Node node) {
+    private static Node progressiveBiasSelect(Node node, int startPlayer) {
         double c = Math.sqrt(2); // Exploration parameter.
+
         return node.children.stream()
                 .max(Comparator.comparingDouble(a -> (a.wins / a.visits)
-                        + c * Math.sqrt(Math.log(node.visits + 1) / (a.visits + 1))))
+                        + c * Math.sqrt(Math.log(node.visits + 1) / (a.visits + 1))
+                        + Heuristic.calculateHeuristic(a.state, startPlayer) / (a.visits + 1)))
                 .orElse(null);
     }
 
-    private static Node select(Node node) {
+    private static Node select(Node node, int startPlayer) {
         while (!node.isLeaf() && !node.state.isGameOver()) {
-            node = uctSelect(node);
+            node = progressiveBiasSelect(node, startPlayer);
         }
         return node;
     }
@@ -45,6 +54,15 @@ public class MonteCarloTreeSearch {
         }
     }
 
+    private static double evaluateMove(GameState state, Move move, int startPlayer) {
+        Move revertMove = state.getRevertMove(state, move);
+        state.applyMove(state, move);
+        double eval = Heuristic.calculateHeuristic(state, startPlayer);
+        state.applyMove(state, revertMove);
+
+        return eval;
+    }
+
     private static double simulate(Node node, int startPlayer) {
         Random rand = new Random();
         GameState simulatedState = new GameState(node.state);
@@ -53,13 +71,9 @@ public class MonteCarloTreeSearch {
 
             if (!possibleMoves.isEmpty()) {
                 possibleMoves.stream()
-                        .skip(rand.nextInt(possibleMoves.size()))
-                        .findFirst()
-                        .ifPresent(randomMove -> simulatedState.applyMove(simulatedState, randomMove));
+                        .max(Comparator.comparingDouble(m -> evaluateMove(simulatedState, m, simulatedState.getActivePlayer())))
+                        .ifPresent(m -> simulatedState.applyMove(simulatedState, m));
             }
-            /*simulatedState.board.printBoard();
-            System.out.println(simulatedState.dice);
-            System.out.println(simulatedState.activePlayer);*/
             //Opponent player PLAYS
             simulatedState.setDice(new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7),
                     rand.nextInt(1, 7)))));
@@ -79,28 +93,52 @@ public class MonteCarloTreeSearch {
 
     private static Node mcts(GameState rootState) {
         Node rootNode = new Node(rootState, null);
+        ExecutorService executor = Executors.newFixedThreadPool(THREADS_COUNT);
+        int simulationsPerThread = SIMULATION_LIMIT / THREADS_COUNT;
 
-        int simulationsCount = 0;
-        long startTime = System.currentTimeMillis();
-        while (System.currentTimeMillis() - startTime < TIME_LIMIT && simulationsCount < SIMULATION_LIMIT) {
-        //for (int i = 0; i < SIMULATION_LIMIT; i++) {
-            // 1. Selection
-            Node selectedNode = select(rootNode);
+        // Define a task for each thread
+        Callable<Void> mctsTask = () -> {
+            int simulationsCount = 0;
+            long startTime = System.currentTimeMillis();
+            while (System.currentTimeMillis() - startTime < TIME_LIMIT && simulationsCount < simulationsPerThread) {
+                // 1. Selection
+                Node selectedNode;
+                synchronized (rootNode) {
+                    selectedNode = select(rootNode, rootState.getActivePlayer());
+                    if (!selectedNode.state.isGameOver()) {
+                        expand(selectedNode, rootState.getActivePlayer());
+                    }
+                }
 
-            // 2. Expansion
-            if (selectedNode.visits != 0) {
-                expand(selectedNode, rootState.getActivePlayer());
+                // 3. Simulation
+                double reward = simulate(selectedNode, rootState.getActivePlayer());
+
+                // 4. Backpropagation
+                synchronized (rootNode) {
+                    backpropagate(selectedNode, reward);
+                }
+
+                simulationsCount++;
             }
+            return null;
+        };
 
-            // 3. Simulation/Rollout
-            double reward = simulate(selectedNode, rootState.getActivePlayer());
-
-            // 4. Backpropagation
-            backpropagate(selectedNode, reward);
-
-            simulationsCount++;
+        // Submit tasks to the thread pool
+        List<Future<Void>> futures = new ArrayList<>();
+        for (int t = 0; t < 12; t++) {
+            futures.add(executor.submit(mctsTask));
         }
-        System.out.println("Simulations: " + simulationsCount);
+
+        // Wait for all threads to complete
+        for (Future<Void> future : futures) {
+            try {
+                future.get();
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+
+        executor.shutdown();
 
         return rootNode.bestChild();
     }

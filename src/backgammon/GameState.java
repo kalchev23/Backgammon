@@ -14,6 +14,7 @@ public class GameState {
     int activePlayer; // 1 or 2
     boolean isTerminal; // True if the game is over.
     double reward = 0.0;
+    Move lastMove;
 
     public GameState() {
         board = new Board();
@@ -21,6 +22,15 @@ public class GameState {
         dice = new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7), rand.nextInt(1, 7))));
         activePlayer = 1;
         isTerminal = false;
+        lastMove = null;
+    }
+
+    public GameState(Board board, int die1, int die2) {
+        this.board = board;
+        dice = new Dice(new ArrayList<>(List.of(die1, die2)));
+        activePlayer = 1;
+        isTerminal = false;
+        lastMove = null;
     }
 
     public GameState(GameState state) {
@@ -29,6 +39,7 @@ public class GameState {
         this.activePlayer = state.activePlayer;
         this.isTerminal = state.isTerminal;
         this.reward = state.reward;
+        this.lastMove = state.lastMove;
     }
 
     private int getTargetPoint(int from, int die) {
@@ -42,7 +53,7 @@ public class GameState {
         boolean[] usedDice = new boolean[diceCount];
         if (board.getCheckersOutPlayer1() == 15 || board.getCheckersOutPlayer2() == 15) {
             isTerminal = true;
-            reward = (startPlayer == activePlayer) ? 0.0 : 1.0;
+            reward = (startPlayer == activePlayer) ? -1.0 : 1.0; //When lose can be 0.0
             return possibleMoves;
         }
         //If all checkers home BEARING OFF
@@ -356,6 +367,8 @@ public class GameState {
         state.board.setBarPlayer2(move.getBarPlayer2());
         state.board.setCheckersOutPlayer1(move.getCheckersOutPlayer1());
         state.board.setCheckersOutPlayer2(move.getCheckersOutPlayer2());
+
+        state.setLastMove(move);
     }
 
     public Move getRevertMove(GameState state, Move move) {
@@ -410,5 +423,13 @@ public class GameState {
 
     public Board getBoard() {
         return board;
+    }
+
+    public Move getLastMove() {
+        return lastMove;
+    }
+
+    public void setLastMove(Move lastMove) {
+        this.lastMove = lastMove;
     }
 }
