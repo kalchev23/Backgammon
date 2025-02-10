@@ -5,17 +5,18 @@ import java.util.Arrays;
 public class Action {
     private int[] from;
     private int[] to;
+    private static final int ACTION_SIZE = 3;
 
     public Action(int fromIndex, int fromCount, int fromPlayer, int toIndex, int toCount, int toPlayer) {
         if (fromIndex != -1) {
-            from = new int[3];
+            from = new int[ACTION_SIZE];
             from[0] = fromIndex;
             from[1] = fromCount;
             from[2] = fromPlayer;
         }
 
         if (toIndex != -1) {
-            to = new int[3];
+            to = new int[ACTION_SIZE];
             to[0] = toIndex;
             to[1] = toCount;
             to[2] = toPlayer;

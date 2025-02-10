@@ -4,13 +4,13 @@ import backgammon.Dice;
 import backgammon.GameState;
 import backgammon.Heuristic;
 import backgammon.Move;
+import backgammon.Playable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 
-public class Expectiminimax {
+public class Expectiminimax implements Playable {
     private enum Node {
         MAX,
         MIN,
@@ -33,7 +33,8 @@ public class Expectiminimax {
                 for (Move move : possibleMoves) {
                     Move revertMove = state.getRevertMove(state, move);
                     state.applyMove(state, move);
-                    double eval = expectiminimax(state, depth + 1, (nodeIndex + 1) % 4, startPlayer);
+                    double eval = expectiminimax(state, depth + 1,
+                            (nodeIndex + 1) % NODES.length, startPlayer);
                     state.applyMove(state, revertMove);
                     maxEval = Math.max(maxEval, eval);
                 }
@@ -47,7 +48,8 @@ public class Expectiminimax {
                 for (Move move : possibleMoves) {
                     Move revertMove = state.getRevertMove(state, move);
                     state.applyMove(state, move);
-                    double eval = expectiminimax(state, depth + 1, (nodeIndex + 1) % 4, startPlayer);
+                    double eval = expectiminimax(state, depth + 1,
+                            (nodeIndex + 1) % NODES.length, startPlayer);
                     state.applyMove(state, revertMove);
                     minEval = Math.min(minEval, eval);
                 }
@@ -60,8 +62,8 @@ public class Expectiminimax {
             for (int i = 0; i < dicePairs.length; i += 2) {
                 state.setDice(new Dice(new ArrayList<>(List.of(dicePairs[i], dicePairs[i + 1]))));
                 state.setActivePlayer((state.getActivePlayer() == 1) ? 2 : 1);
-                chancesSum += expectiminimax(state, depth + 1, (nodeIndex + 1) % 4, startPlayer)
-                        * Dice.probability(dicePairs[i], dicePairs[i + 1]); //Node.MIN, Node.MAX
+                chancesSum += expectiminimax(state, depth + 1, (nodeIndex + 1) % NODES.length,
+                        startPlayer) * Dice.probability(dicePairs[i], dicePairs[i + 1]);
             }
             return chancesSum;
         }
@@ -89,17 +91,15 @@ public class Expectiminimax {
         return bestMove;
     }
 
+    @Override
     public Move playMove(GameState rootState) {
         int activePlayer = rootState.getActivePlayer();
         Move bestMove = findBestMove(rootState, activePlayer);
         if (bestMove != null) {
             rootState.applyMove(rootState, bestMove);
         }
-        Random rand = new Random();
-        rootState.setDice(new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7),
-                rand.nextInt(1, 7)))));
+        rootState.switchPlayerTurn();
         rootState.setActivePlayer((activePlayer == 1) ? 2 : 1);
-
         return bestMove;
     }
 }

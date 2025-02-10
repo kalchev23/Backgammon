@@ -5,7 +5,6 @@ import java.util.AbstractMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 
 public class GameState {
@@ -16,10 +15,13 @@ public class GameState {
     double reward = 0.0;
     Move lastMove;
 
+    private static final int CHECKERS_OUT_TO_WIN = 15;
+    private static final int HOME_OPPONENT = 6;
+    private static final int HOME_ACTIVE_PLAYER = 17;
+
     public GameState() {
         board = new Board();
-        Random rand = new Random();
-        dice = new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7), rand.nextInt(1, 7))));
+        dice = Dice.of();
         activePlayer = 1;
         isTerminal = false;
         lastMove = null;
@@ -51,7 +53,8 @@ public class GameState {
 
         int diceCount = dice.diceValues().size();
         boolean[] usedDice = new boolean[diceCount];
-        if (board.getCheckersOutPlayer1() == 15 || board.getCheckersOutPlayer2() == 15) {
+        if (board.getCheckersOutPlayer1() == CHECKERS_OUT_TO_WIN
+                || board.getCheckersOutPlayer2() == CHECKERS_OUT_TO_WIN) {
             isTerminal = true;
             reward = (startPlayer == activePlayer) ? -1.0 : 1.0; //When lose can be 0.0
             return possibleMoves;
@@ -59,11 +62,11 @@ public class GameState {
         //If all checkers home BEARING OFF
         boolean isBearingOff = false;
         if (activePlayer == 1) {
-            if (board.getHomePlayer1() + board.getCheckersOutPlayer1() == 15) {
+            if (board.getHomePlayer1() + board.getCheckersOutPlayer1() == CHECKERS_OUT_TO_WIN) {
                 isBearingOff = true;
             }
         } else {
-            if (board.getHomePlayer2() + board.getCheckersOutPlayer2() == 15) {
+            if (board.getHomePlayer2() + board.getCheckersOutPlayer2() == CHECKERS_OUT_TO_WIN) {
                 isBearingOff = true;
             }
         }
@@ -83,13 +86,13 @@ public class GameState {
     private int countAtHigherPositionInHome(GameState state, int position) {
         int[][] newBoard = state.board.getBoard();
         int count = 0;
-        for (int i = position + 1; i < 6; i++) {
+        for (int i = position + 1; i < HOME_OPPONENT; i++) {
             if (newBoard[i][1] == activePlayer) {
                 count += newBoard[i][0];
             }
         }
 
-        for (int i = position - 1; i > 17; i--) {
+        for (int i = position - 1; i > HOME_ACTIVE_PLAYER; i--) {
             if (newBoard[i][1] == activePlayer) {
                 count += newBoard[i][0];
             }
@@ -100,8 +103,8 @@ public class GameState {
 
     private boolean isMoveLegal(GameState state, int from, int to, boolean isBearingOff) {
         // Out of bounds
-        if (to < 0 || to >= 24) {
-            if (to < -1 || to > 24) {
+        if (to < 0 || to >= Board.BOARD_CAPACITY) {
+            if (to < -1 || to > Board.BOARD_CAPACITY) {
                 return isBearingOff && countAtHigherPositionInHome(state, from) == 0;
             }
             return isBearingOff;
@@ -123,7 +126,7 @@ public class GameState {
             inactivePlayerHome = move.board.getHomePlayer2();
             activePlayerBar = move.board.getBarPlayer1();
             inactivePlayerBar = move.board.getBarPlayer2();
-            if (from <= 17 && to > 17) {
+            if (from <= HOME_ACTIVE_PLAYER && to > HOME_ACTIVE_PLAYER) {
                 activePlayerHome += i;
             }
         } else {
@@ -131,7 +134,7 @@ public class GameState {
             inactivePlayerHome = move.board.getHomePlayer1();
             activePlayerBar = move.board.getBarPlayer2();
             inactivePlayerBar = move.board.getBarPlayer1();
-            if (from >= 6 && to < 6) {
+            if (from >= HOME_OPPONENT && to < HOME_OPPONENT) {
                 activePlayerHome += i;
             }
         }
@@ -146,11 +149,11 @@ public class GameState {
             inactivePlayerBar += i;
 
             if (activePlayer == 1) {
-                if (to < 6) {
+                if (to < HOME_OPPONENT) {
                     inactivePlayerHome -= i;
                 }
             } else {
-                if (to > 17) {
+                if (to > HOME_ACTIVE_PLAYER) {
                     inactivePlayerHome -= i;
                 }
             }
@@ -274,7 +277,7 @@ public class GameState {
             int activePlayerBar = activePlayer == 1 ? state.board.getBarPlayer1() : state.board.getBarPlayer2();
             if (activePlayerBar > 0) {
                 //Player has checkers on the bar
-                int homeStartPoint = (activePlayer == 1) ? -1 : 24;
+                int homeStartPoint = (activePlayer == 1) ? -1 : Board.BOARD_CAPACITY;
                 int targetPoint = getTargetPoint(homeStartPoint, dice.diceValues().get(i));
                 if (isMoveLegal(state, homeStartPoint, targetPoint, false)) {
                     Map.Entry<Action, Boolean> actionPair = state.makeMove(
@@ -296,7 +299,7 @@ public class GameState {
                     isMoveMade = true;
                 }
             } else {
-                for (int point = 0; point < 24; point++) {
+                for (int point = 0; point < Board.BOARD_CAPACITY; point++) {
                     if (state.board.getBoard()[point][1] == state.activePlayer) {
                         int targetPoint = getTargetPoint(point, dice.diceValues().get(i));
                         if (isMoveLegal(state, point, targetPoint, isBearingOff)) {
@@ -304,7 +307,7 @@ public class GameState {
                             Map.Entry<Action, Boolean> actionPair;
                             Action action;
                             boolean isOpponentHit = false;
-                            if (targetPoint < 0 || targetPoint >= 24) {
+                            if (targetPoint < 0 || targetPoint >= Board.BOARD_CAPACITY) {
                                 action = state.makeMoveOut(state, point);
                                 isMoveOut = true;
                             } else {
@@ -337,9 +340,6 @@ public class GameState {
                 possibleMovesOneDieOnly.add(new Move(currentMoves, state.board.getHomePlayer1(),
                         state.board.getHomePlayer2(), state.board.getBarPlayer1(), state.board.getBarPlayer2(),
                         state.board.getCheckersOutPlayer1(), state.board.getCheckersOutPlayer2()));
-                    /*for (GameState move : currentMoves) {
-                        possibleMovesOneDieOnly.add(move.copy());
-                    }*/
                 return;
             }
         }
@@ -399,6 +399,11 @@ public class GameState {
         return new Move(revertActions, state.board.getHomePlayer1(), state.board.getHomePlayer2(),
                 state.board.getBarPlayer1(), state.board.getBarPlayer2(), state.board.getCheckersOutPlayer1(),
                 state.board.getCheckersOutPlayer2());
+    }
+
+    public void switchPlayerTurn() {
+        this.setDice(Dice.of());
+        this.setActivePlayer((this.getActivePlayer() == 1) ? 2 : 1);
     }
 
     public boolean isGameOver() {

@@ -4,20 +4,16 @@ import backgammon.Dice;
 import backgammon.GameState;
 import backgammon.Heuristic;
 import backgammon.Move;
+import backgammon.Playable;
 
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
-import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
-public class MonteCarloTreeSearch {
-    private static final int SIMULATION_LIMIT = 10_000; // Number of simulations per move.
+public class MonteCarloTreeSearch implements Playable {
+    private static final int SIMULATION_LIMIT = 5_000; // Number of simulations per move.
     private static final int TIME_LIMIT = 5_000;
     private static final int THREADS_COUNT = 12;
 
@@ -41,8 +37,7 @@ public class MonteCarloTreeSearch {
     private static void expand(Node node, int startPlayer) {
         Set<Move> possibleMoves = node.state.getPossibleMoves(startPlayer);
         int inactivePlayer = (node.state.getActivePlayer() == 1) ? 2 : 1;
-        Random rand = new Random();
-        Dice newDice = new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7), rand.nextInt(1, 7))));
+        Dice newDice = Dice.of();
         for (Move move : possibleMoves) {
             GameState state = new GameState(node.state);
             state.applyMove(state, move);
@@ -64,20 +59,18 @@ public class MonteCarloTreeSearch {
     }
 
     private static double simulate(Node node, int startPlayer) {
-        Random rand = new Random();
         GameState simulatedState = new GameState(node.state);
         while (!simulatedState.isGameOver()) {
             Set<Move> possibleMoves = simulatedState.getPossibleMoves(startPlayer);
 
             if (!possibleMoves.isEmpty()) {
                 possibleMoves.stream()
-                        .max(Comparator.comparingDouble(m -> evaluateMove(simulatedState, m, simulatedState.getActivePlayer())))
+                        .max(Comparator.comparingDouble(m -> evaluateMove(simulatedState, m,
+                                simulatedState.getActivePlayer())))
                         .ifPresent(m -> simulatedState.applyMove(simulatedState, m));
             }
             //Opponent player PLAYS
-            simulatedState.setDice(new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7),
-                    rand.nextInt(1, 7)))));
-            simulatedState.setActivePlayer((simulatedState.getActivePlayer() == 1) ? 2 : 1);
+            simulatedState.switchPlayerTurn();
         }
         return simulatedState.evaluateReward();
     }
@@ -97,7 +90,7 @@ public class MonteCarloTreeSearch {
         int simulationsPerThread = SIMULATION_LIMIT / THREADS_COUNT;
 
         // Define a task for each thread
-        Callable<Void> mctsTask = () -> {
+        Runnable mctsTask = () -> {
             int simulationsCount = 0;
             long startTime = System.currentTimeMillis();
             while (System.currentTimeMillis() - startTime < TIME_LIMIT && simulationsCount < simulationsPerThread) {
@@ -120,40 +113,35 @@ public class MonteCarloTreeSearch {
 
                 simulationsCount++;
             }
-            return null;
         };
 
-        // Submit tasks to the thread pool
-        List<Future<Void>> futures = new ArrayList<>();
-        for (int t = 0; t < 12; t++) {
-            futures.add(executor.submit(mctsTask));
-        }
-
-        // Wait for all threads to complete
-        for (Future<Void> future : futures) {
-            try {
-                future.get();
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
+        for (int t = 0; t < THREADS_COUNT; t++) {
+            executor.execute(mctsTask);
         }
 
         executor.shutdown();
 
+        //Wait for all tasks to complete
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         return rootNode.bestChild();
     }
 
-    public static GameState playMove(GameState rootState) {
+    @Override
+    public Move playMove(GameState rootState) {
         Node bestMoveNode = mcts(rootState);
 
+        Move bestMove = null;
         if (bestMoveNode != null) {
-            System.out.println("Best Move Reward: " + bestMoveNode.wins / bestMoveNode.visits);
-            return bestMoveNode.state;
+            //System.out.println("Best Move Reward: " + bestMoveNode.wins / bestMoveNode.visits);
+            bestMove = bestMoveNode.state.getLastMove();
+            rootState.applyMove(rootState, bestMove);
         }
-        Random rand = new Random();
-        rootState.setDice(new Dice(new ArrayList<>(List.of(rand.nextInt(1, 7),
-                rand.nextInt(1, 7)))));
-        rootState.setActivePlayer((rootState.getActivePlayer() == 1) ? 2 : 1);
-        return rootState;
+        rootState.switchPlayerTurn();
+        return bestMove;
     }
 }

@@ -17,17 +17,22 @@ public class Board {
 
     private int maxRows;
 
+    public static final int BOARD_CAPACITY = 24;
+    public static final int HALF_BOARD_CAPACITY = 12;
+    private static final int HOME_INITIAL_CAPACITY = 5;
+    private static final int MAX_ROWS_INITIAL_CAPACITY = 5;
+
     public Board() {
-        board = new int[24][2];
-        homePlayer1 = 5;
-        homePlayer2 = 5;
+        board = new int[BOARD_CAPACITY][2];
+        homePlayer1 = HOME_INITIAL_CAPACITY;
+        homePlayer2 = HOME_INITIAL_CAPACITY;
 
         initializeBoard();
 
         player1Symbol = 'X';
         player2Symbol = 'O';
 
-        maxRows = 5;
+        maxRows = MAX_ROWS_INITIAL_CAPACITY;
     }
 
     public Board(Board board) {
@@ -64,14 +69,14 @@ public class Board {
 
     private void updateMaxRows() {
         boolean isChanged = false;
-        int tempMaxRows = 5;
-        for (int i = 0; i < 24; i++) {
-            if (board[i][0] > 5) {
+        int tempMaxRows = MAX_ROWS_INITIAL_CAPACITY;
+        for (int i = 0; i < BOARD_CAPACITY; i++) {
+            if (board[i][0] > MAX_ROWS_INITIAL_CAPACITY) {
                 tempMaxRows = Math.max(tempMaxRows, board[i][0]);
                 isChanged = true;
             }
         }
-        maxRows = isChanged ? tempMaxRows : 5;
+        maxRows = isChanged ? tempMaxRows : MAX_ROWS_INITIAL_CAPACITY;
     }
 
     private void printBoardLine(int rowNumber, int startIndex, int endIndex, boolean isTop, boolean hasOnBar) {
@@ -118,13 +123,14 @@ public class Board {
                 hasOnBar = true;
                 tempBarPlayer2--;
             }
-            printBoardLine(row, 12, 24, false, hasOnBar);
+            printBoardLine(row, HALF_BOARD_CAPACITY, BOARD_CAPACITY, false, hasOnBar);
         }
 
         System.out.println("|13  14  15  16  17  18 |   | 19  20  21  22  23  24|");
         System.out.println(" --------------------------------------------------- ");
 
         System.out.printf("Out: Player 1 - %d, Player 2 - %d%n", checkersOutPlayer1, checkersOutPlayer2);
+        System.out.println();
     }
 
     public int[][] getBoard() {
